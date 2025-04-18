@@ -1,71 +1,51 @@
 const express = require("express");
-const http = require("http");
-const WebSocket = require("ws");
-const cors = require("cors");
 const fs = require("fs");
-require("dotenv").config();
-
+const cors = require("cors");
 const app = express();
+const PORT = process.env.PORT || 3000;
+const DATA_FILE = "./seats.json";
+
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 3000;
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
-
-const SEATS_FILE = "seats.json";
-
-// 初期座席ファイルの用意
-if (!fs.existsSync(SEATS_FILE)) {
-  const initialSeats = Array(40).fill(null); // 0〜39番
-  fs.writeFileSync(SEATS_FILE, JSON.stringify(initialSeats, null, 2));
+// 初期化：ファイルがなければ空の座席40個分作る
+if (!fs.existsSync(DATA_FILE)) {
+  const emptyData = {};
+  for (let i = 1; i <= 40; i++) {
+    emptyData[i] = null;
+  }
+  fs.writeFileSync(DATA_FILE, JSON.stringify(emptyData, null, 2));
 }
 
-// 座席データの読み書き
-const readSeats = () => JSON.parse(fs.readFileSync(SEATS_FILE));
-const writeSeats = (data) => fs.writeFileSync(SEATS_FILE, JSON.stringify(data, null, 2));
-
-// WebSocket接続
-wss.on("connection", (ws) => {
-  ws.send(JSON.stringify({ type: "seats", data: readSeats() }));
-
-  ws.on("message", (message) => {
-    const { type, seatIndex, name, number } = JSON.parse(message);
-
-    if (type === "update") {
-      const seats = readSeats();
-      seats[seatIndex] = { name, number };
-      writeSeats(seats);
-
-      // 全クライアントに送信
-      const payload = JSON.stringify({ type: "seats", data: seats });
-      wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(payload);
-        }
-      });
-    }
-  });
-});
-
+// 座席情報を取得
 app.get("/seats", (req, res) => {
-  res.json(readSeats());
+  const data = JSON.parse(fs.readFileSync(DATA_FILE));
+  res.json(data);
 });
 
+// 生徒が座席に登録する
+app.post("/register", (req, res) => {
+  const { seat, name, studentId } = req.body;
+  if (!seat || !name || !studentId) {
+    return res.status(400).json({ message: "不正なデータです" });
+  }
+
+  const data = JSON.parse(fs.readFileSync(DATA_FILE));
+  data[seat] = { name, studentId };
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  res.json({ message: "登録完了" });
+});
+
+// 先生が全座席をリセットする
 app.post("/reset", (req, res) => {
-  const newSeats = Array(40).fill(null);
-  writeSeats(newSeats);
-
-  const payload = JSON.stringify({ type: "seats", data: newSeats });
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(payload);
-    }
-  });
-
-  res.json({ success: true });
+  const newData = {};
+  for (let i = 1; i <= 40; i++) {
+    newData[i] = null;
+  }
+  fs.writeFileSync(DATA_FILE, JSON.stringify(newData, null, 2));
+  res.json({ message: "全席リセットしました" });
 });
 
-server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
 });
