@@ -1,15 +1,20 @@
 const express = require("express");
 const http = require("http");
 const WebSocket = require("ws");
-const fs = require("fs");
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-let seats = Array(42).fill(null);
+let seatsByClass = {}; // className => [seat array]
 
-// クライアントに座席データ送信
+function getSeats(className) {
+  if (!seatsByClass[className]) {
+    seatsByClass[className] = Array(42).fill(null);
+  }
+  return seatsByClass[className];
+}
+
 function broadcast(data) {
   const msg = JSON.stringify(data);
   wss.clients.forEach(client => {
@@ -19,27 +24,27 @@ function broadcast(data) {
   });
 }
 
-// WebSocket処理
 wss.on("connection", (ws) => {
-  // 初期座席を送る
-  ws.send(JSON.stringify({ type: "seats", data: seats }));
-
   ws.on("message", (message) => {
     try {
       const data = JSON.parse(message);
+      const className = data.className;
+      if (!className) return;
+
+      const seats = getSeats(className);
 
       if (data.type === "getSeats") {
-        ws.send(JSON.stringify({ type: "seats", data: seats }));
+        ws.send(JSON.stringify({ type: "seats", data: seats, className }));
       } else if (data.type === "reset") {
-        seats = Array(42).fill(null);
-        broadcast({ type: "reset" });
+        seatsByClass[className] = Array(42).fill(null);
+        broadcast({ type: "reset", className });
       } else if (data.type === "delete") {
         seats[data.seat] = null;
-        broadcast({ delete: data.seat });
+        broadcast({ delete: data.seat, className });
       } else if (typeof data.seat === "number" && data.name) {
         if (!seats[data.seat]) {
           seats[data.seat] = data.name;
-          broadcast({ seat: data.seat, name: data.name });
+          broadcast({ seat: data.seat, name: data.name, className });
         }
       }
     } catch (err) {
@@ -48,8 +53,7 @@ wss.on("connection", (ws) => {
   });
 });
 
-// サーバー起動
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
