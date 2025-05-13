@@ -99,7 +99,7 @@ wss.on("connection", (ws) => {
       } else if (data.type === "delete") {
         seats[data.seat] = null;
         broadcast({ delete: data.seat, className });
-        console.log(`deleted seat data. className: ${className}, number: ${data.seat}`);
+        console.log(`deleted seat number ${data.seat} data. className: ${className}`);
       } else if (data.type === "random" || data.type === "random_front") {
         enqueueRequest(className, ws, data);
       } else if (typeof data.seat === "number" && data.name) {
