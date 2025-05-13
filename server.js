@@ -74,6 +74,7 @@ function processNextRequest(className) {
   if (typeof index === "number" && data.name && !seats[index]) {
     seats[index] = data.name;
     broadcast({ seat: index, name: data.name, className });
+    console.log(`${data.name} was set in seat number ${index}. className: ${className}`);
   }
 
   setTimeout(() => processNextRequest(className), 0);
@@ -90,18 +91,22 @@ wss.on("connection", (ws) => {
 
       if (data.type === "getSeats") {
         ws.send(JSON.stringify({ type: "seats", data: seats, className }));
+        console.log(`received getSeats. className: ${className}`);
       } else if (data.type === "reset") {
         seatsByClass[className] = Array(42).fill(null);
         broadcast({ type: "reset", className });
+        console.log(`reset seats. className: ${className}`);
       } else if (data.type === "delete") {
         seats[data.seat] = null;
         broadcast({ delete: data.seat, className });
+        console.log(`deleted seat data. className: ${className}, number: ${data.seat}`);
       } else if (data.type === "random" || data.type === "random_front") {
         enqueueRequest(className, ws, data);
       } else if (typeof data.seat === "number" && data.name) {
         if (!seats[data.seat]) {
           seats[data.seat] = data.name;
           broadcast({ seat: data.seat, name: data.name, className });
+          console.log(`${data.name} was set in seat number ${data.seat}. className: ${className}`);
         }
       }
     } catch (err) {
