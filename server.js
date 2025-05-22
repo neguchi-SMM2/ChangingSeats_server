@@ -71,7 +71,7 @@ function processNextRequest(className) {
     ? getRandomNullIndexInRange(seats)
     : getRandomNullIndex(seats);
 
-  if (typeof index === "number" && data.name && !seats[index]) {
+  if (typeof index === "number" && data.name && !seats[index] && !seats.includes(data.name)) {
     seats[index] = data.name;
     broadcast({ seat: index, name: data.name, className });
     console.log(`${data.name} was set in seat number ${index}. className: ${className}`);
