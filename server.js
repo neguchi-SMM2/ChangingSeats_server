@@ -92,7 +92,10 @@ function processNextRequest(className) {
 wss.on("connection", (ws) => {
   ws.on("message", (message) => {
     try {
-      const data = JSON.parse(message);
+      const data = typeof message === "string"
+        ? JSON.parse(message)
+        : (Buffer.isBuffer(message) ? JSON.parse(message.toString()) : message);
+
       const className = data.className;
       if (!className) return;
 
