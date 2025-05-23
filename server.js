@@ -1,4 +1,5 @@
 const express = require("express");
+const { json } = require("express/lib/response");
 const http = require("http");
 const WebSocket = require("ws");
 
@@ -7,6 +8,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 let seatsByClass = {}; 
+let studentsName = {}; 
 const requestQueues = {}; 
 const processingFlags = {}; 
 
@@ -15,6 +17,13 @@ function getSeats(className) {
     seatsByClass[className] = Array(42).fill(null);
   }
   return seatsByClass[className];
+}
+
+function getStudentsName(className) {
+  if (!studentsName[className]) {
+    studentsName[className] = array(42).fill(null); 
+  }
+  return studentsName[className];
 }
 
 function broadcast(data) {
@@ -88,6 +97,7 @@ wss.on("connection", (ws) => {
       if (!className) return;
 
       const seats = getSeats(className);
+      const names = getStudentsName(className);
 
       if (data.type === "getSeats") {
         ws.send(JSON.stringify({ type: "seats", data: seats, className }));
@@ -107,6 +117,14 @@ wss.on("connection", (ws) => {
           seats[data.seat] = data.name;
           broadcast({ seat: data.seat, name: data.name, className });
           console.log(`${data.name} was set in seat number ${data.seat}. className: ${className}`);
+        }
+      } else if (data.type === "getStudentsName") {
+        ws.send(JSON.stringify({ type: "names", data: names, className })); 
+        console.log(`received getSeats. className: ${className}`); 
+      } else if (data.type === "registerName") {
+        if (!names[data.name]) {
+          names[names.length] = data.name; 
+          console.log(`${data.name} was registered in className ${className}`);
         }
       }
     } catch (err) {
