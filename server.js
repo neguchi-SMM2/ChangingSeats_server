@@ -113,6 +113,8 @@ wss.on("connection", (ws) => {
           broadcast({ seat: data.seat, name: data.name, className });
           console.log(`${data.name} was set in seat number ${data.seat}. className: ${className}`);
         }
+      } else {
+        console.log(`${data.type} is unknown datatype.`);
       }
     } catch (err) {
       console.error("Invalid message:", err);
