@@ -103,6 +103,10 @@ wss.on("connection", (ws) => {
         console.log(`deleted seat number ${data.seat} data. className: ${className}`);
       } else if (data.type === "random" || data.type === "random_front") {
         enqueueRequest(className, ws, data);
+      } else if (data.type === "all_set") {
+        seatsByClass[className] = data.name;
+        broadcast({ type: "seats", data: data.name, className });
+        console.log(`${className} was set.`);
       } else if (typeof data.seat === "number" && data.name) {
         if (!seats[data.seat]) {
           seats[data.seat] = data.name;
