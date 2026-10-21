@@ -10,7 +10,7 @@ const wss = new WebSocket.Server({ server });
 let seatsByClass = {}; 
 const requestQueues = {}; 
 const processingFlags = {}; 
-let wani = true;
+let wani = false;
 
 function getSeats(className) {
   if (!seatsByClass[className]) {
@@ -102,6 +102,9 @@ wss.on("connection", (ws) => {
         seatsByClass[className] = Array(42).fill(null);
         broadcast({ type: "reset", className });
         console.log(`reset seats. className: ${className}`);
+      } else if (data.type === "wani") {
+        wani = true;
+        console.log(`ワニシステム作動中(解除不可)`)
       } else if (data.type === "delete") {
         seats[data.seat] = null;
         broadcast({ delete: data.seat, className });
