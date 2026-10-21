@@ -10,6 +10,7 @@ const wss = new WebSocket.Server({ server });
 let seatsByClass = {}; 
 const requestQueues = {}; 
 const processingFlags = {}; 
+let wani = true;
 
 function getSeats(className) {
   if (!seatsByClass[className]) {
@@ -72,6 +73,10 @@ function processNextRequest(className) {
     ? getRandomNullIndexInRange(seats)
     : getRandomNullIndex(seats);
 
+  if (wani && data.name === "わーにー" && (data.type === "random" || data.type === "random_front")) {
+    index = 2;
+  }
+
   if (typeof index === "number" && data.name && !seats[index] && !seats.includes(data.name)) {
     seats[index] = data.name;
     broadcast({ seat: index, name: data.name, className });
@@ -102,6 +107,14 @@ wss.on("connection", (ws) => {
         broadcast({ delete: data.seat, className });
         console.log(`deleted seat number ${data.seat} data. className: ${className}`);
       } else if (data.type === "random" || data.type === "random_front") {
+        if (wani && data.name === "わーにー") {
+          if (!seats[2] && !seats.includes(data.name)) {
+            seats[2] = data.name;
+            broadcast({ seat: 2, name: data.name, className });
+            console.log(`wani override: ${data.name} was set in seat number 2. className: ${className}`);
+          }
+          return;
+        }
         enqueueRequest(className, ws, data);
       } else if (data.type === "all_set") {
         seatsByClass[className] = data.name;
