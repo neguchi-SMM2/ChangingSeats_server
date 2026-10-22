@@ -104,7 +104,7 @@ wss.on("connection", (ws) => {
         console.log(`reset seats. className: ${className}`);
       } else if (data.type === "wani") {
         wani = true;
-        console.log(`ワニシステム作動中(解除不可)`)
+        console.log(`ワニシステム作動中(解除不可)`);
       } else if (data.type === "delete") {
         seats[data.seat] = null;
         broadcast({ delete: data.seat, className });
