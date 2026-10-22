@@ -7,9 +7,9 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-let seatsByClass = {}; 
-const requestQueues = {}; 
-const processingFlags = {}; 
+let seatsByClass = {};
+const requestQueues = {};
+const processingFlags = {};
 let wani = false;
 
 function getSeats(className) {
@@ -30,7 +30,7 @@ function broadcast(data) {
 
 function getRandomNullIndex(list) {
   const nullIndices = list
-    .map((v, i) => v === null ? i : -1)
+    .map((v, i) => (v === null ? i : -1))
     .filter(i => i !== -1);
   if (nullIndices.length === 0) return undefined;
   const randomIndex = Math.floor(Math.random() * nullIndices.length);
@@ -39,7 +39,7 @@ function getRandomNullIndex(list) {
 
 function getRandomNullIndexExcluding(list, excludedIndex = null) {
   const nullIndices = list
-    .map((v, i) => (v === null && i !== excludedIndex) ? i : -1)
+    .map((v, i) => (v === null && i !== excludedIndex ? i : -1))
     .filter(i => i !== -1);
   if (nullIndices.length === 0) return undefined;
   const randomIndex = Math.floor(Math.random() * nullIndices.length);
@@ -70,10 +70,8 @@ function getRandomNullIndexInRangeExcluding(list, start = 0, end = 17, excludedI
   return nullIndices[randomIndex];
 }
 
-function isSeat2ReservedForWani(seats, name) {
-  if (!wani) return false;
-  if (name === "わーにー") return false;
-  return !seats.every((seat, index) => index === 2 || seat !== null);
+function allOtherSeatsAreFilled(seats) {
+  return seats.every((seat, index) => index === 2 || seat !== null);
 }
 
 function enqueueRequest(className, ws, data) {
@@ -96,19 +94,24 @@ function processNextRequest(className) {
   const { ws, data } = queue.shift();
 
   const seats = getSeats(className);
-  let index = data.type === "random_front"
-    ? getRandomNullIndexInRange(seats)
-    : getRandomNullIndex(seats);
 
-  if (wani && data.name === "わーにー" && (data.type === "random" || data.type === "random_front")) {
+  let index;
+  if (wani && data.name === "わーにー") {
     index = 2;
-  } else if (wani && data.name !== "わーにー" && index === 2) {
-    const allOtherSeatsFilled = seats.every((seat, seatIndex) => seatIndex === 2 || seat !== null);
-    if (!allOtherSeatsFilled) {
+  } else if (wani && data.name !== "わーにー") {
+    if (allOtherSeatsAreFilled(seats)) {
+      index = data.type === "random_front"
+        ? getRandomNullIndexInRange(seats)
+        : getRandomNullIndex(seats);
+    } else {
       index = data.type === "random_front"
         ? getRandomNullIndexInRangeExcluding(seats, 0, 17, 2)
         : getRandomNullIndexExcluding(seats, 2);
     }
+  } else {
+    index = data.type === "random_front"
+      ? getRandomNullIndexInRange(seats)
+      : getRandomNullIndex(seats);
   }
 
   if (typeof index === "number" && data.name && !seats[index] && !seats.includes(data.name)) {
@@ -152,14 +155,13 @@ wss.on("connection", (ws) => {
           }
           return;
         }
-
         enqueueRequest(className, ws, data);
       } else if (data.type === "all_set") {
         seatsByClass[className] = data.name;
         broadcast({ type: "seats", data: data.name, className });
         console.log(`${className} was set.`);
       } else if (typeof data.seat === "number" && data.name) {
-        if (wani && data.seat === 2 && data.name !== "わーにー" && !seats.every((seat, index) => index === 2 || seat !== null)) {
+        if (wani && data.name !== "わーにー" && data.seat === 2 && !allOtherSeatsAreFilled(seats)) {
           console.log(`wani blocked: ${data.name} cannot sit in seat 2 while other seats still have room. className: ${className}`);
           return;
         }
