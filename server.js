@@ -37,6 +37,15 @@ function getRandomNullIndex(list) {
   return nullIndices[randomIndex];
 }
 
+function getRandomNullIndexExcluding(list, excludedIndex = null) {
+  const nullIndices = list
+    .map((v, i) => (v === null && i !== excludedIndex) ? i : -1)
+    .filter(i => i !== -1);
+  if (nullIndices.length === 0) return undefined;
+  const randomIndex = Math.floor(Math.random() * nullIndices.length);
+  return nullIndices[randomIndex];
+}
+
 function getRandomNullIndexInRange(list, start = 0, end = 17) {
   const nullIndices = [];
   for (let i = start; i <= end; i++) {
@@ -47,6 +56,24 @@ function getRandomNullIndexInRange(list, start = 0, end = 17) {
   if (nullIndices.length === 0) return undefined;
   const randomIndex = Math.floor(Math.random() * nullIndices.length);
   return nullIndices[randomIndex];
+}
+
+function getRandomNullIndexInRangeExcluding(list, start = 0, end = 17, excludedIndex = null) {
+  const nullIndices = [];
+  for (let i = start; i <= end; i++) {
+    if (list[i] === null && i !== excludedIndex) {
+      nullIndices.push(i);
+    }
+  }
+  if (nullIndices.length === 0) return undefined;
+  const randomIndex = Math.floor(Math.random() * nullIndices.length);
+  return nullIndices[randomIndex];
+}
+
+function isSeat2ReservedForWani(seats, name) {
+  if (!wani) return false;
+  if (name === "わーにー") return false;
+  return !seats.every((seat, index) => index === 2 || seat !== null);
 }
 
 function enqueueRequest(className, ws, data) {
@@ -75,6 +102,13 @@ function processNextRequest(className) {
 
   if (wani && data.name === "わーにー" && (data.type === "random" || data.type === "random_front")) {
     index = 2;
+  } else if (wani && data.name !== "わーにー" && index === 2) {
+    const allOtherSeatsFilled = seats.every((seat, seatIndex) => seatIndex === 2 || seat !== null);
+    if (!allOtherSeatsFilled) {
+      index = data.type === "random_front"
+        ? getRandomNullIndexInRangeExcluding(seats, 0, 17, 2)
+        : getRandomNullIndexExcluding(seats, 2);
+    }
   }
 
   if (typeof index === "number" && data.name && !seats[index] && !seats.includes(data.name)) {
@@ -118,12 +152,18 @@ wss.on("connection", (ws) => {
           }
           return;
         }
+
         enqueueRequest(className, ws, data);
       } else if (data.type === "all_set") {
         seatsByClass[className] = data.name;
         broadcast({ type: "seats", data: data.name, className });
         console.log(`${className} was set.`);
       } else if (typeof data.seat === "number" && data.name) {
+        if (wani && data.seat === 2 && data.name !== "わーにー" && !seats.every((seat, index) => index === 2 || seat !== null)) {
+          console.log(`wani blocked: ${data.name} cannot sit in seat 2 while other seats still have room. className: ${className}`);
+          return;
+        }
+
         if (!seats[data.seat]) {
           seats[data.seat] = data.name;
           broadcast({ seat: data.seat, name: data.name, className });
