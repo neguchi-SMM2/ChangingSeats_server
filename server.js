@@ -186,6 +186,7 @@ wss.on("connection", (ws) => {
         enqueueRequest(className, ws, data);
       } else if (data.type === "all_set") {
         seatsByClass[className] = data.name;
+        numsByClass[className] = Array(42).fill(null);
         broadcast({ type: "seats", data: data.name, className });
         console.log(`${className} was set.`);
       } else if (typeof data.seat === "number" && data.name) {
