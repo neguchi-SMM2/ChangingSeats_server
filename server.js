@@ -12,7 +12,7 @@ const numsByClass = {};
 const requestQueues = {};
 const processingFlags = {};
 let wani = false;
-let kantaro = false;
+let kani = false;
 
 function getSeats(className) {
   if (!seatsByClass[className]) {
