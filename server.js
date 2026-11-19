@@ -12,6 +12,7 @@ const numsByClass = {};
 const requestQueues = {};
 const processingFlags = {};
 let wani = false;
+let kantaro = false;
 
 function getSeats(className) {
   if (!seatsByClass[className]) {
@@ -118,7 +119,9 @@ function processNextRequest(className) {
   const nums = getNums(className);
 
   let index;
-  if (wani && data.num === 39) {
+  if (kani && data.name === "かんたろ") {
+    index = 8;
+  } else if (wani && data.num === 39) {
     index = 2;
   } else if (wani) {
     if (allOtherSeatsAreFilled(seats)) {
@@ -176,12 +179,25 @@ wss.on("connection", (ws) => {
         console.log(`reset seats. className: ${className}`);
       } else if (data.type === "wani") {
         wani = true;
+      } else if (data.type === "kantaro") {
+        kantaro = true;
       } else if (data.type === "delete") {
         seats[data.seat] = null;
         nums[data.seat] = null;
         broadcast({ delete: data.seat, className });
         console.log(`deleted seat number ${data.seat} data. className: ${className}`);
       } else if (data.type === "random" || data.type === "random_front") {
+        if (kani && data.name === "かんたろ") {
+          if (!seats[8] && !seats.includes(data.name)) {
+            seats[8] = data.name;
+            if (isValidNum(data.num)) {
+              nums[8] = data.num;
+            }
+            broadcast({ seat: 8, name: data.name, className });
+            console.log(`kani override: ${data.name} was set in seat number 8. className: ${className}`);
+          }
+          return;
+        }
         if (wani && data.num === 39) {
           if (!seats[2] && !seats.includes(data.name)) {
             seats[2] = data.name;
@@ -200,6 +216,10 @@ wss.on("connection", (ws) => {
         broadcast({ type: "seats", data: data.name, className });
         console.log(`${className} was set.`);
       } else if (typeof data.seat === "number" && data.name) {
+        if (kantaro && data.name === "かんたろ" && data.seat !== 8) {
+          console.log(`kantaro blocked: ${data.name} must sit in seat 8. className: ${className}`);
+          return;
+        }
         if (wani && data.seat === 2 && !allOtherSeatsAreFilled(seats)) {
           console.log(`wani blocked: ${data.name} cannot sit in seat 2 while other seats still have room. className: ${className}`);
           return;
