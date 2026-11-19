@@ -119,9 +119,9 @@ function processNextRequest(className) {
   const nums = getNums(className);
 
   let index;
-  if (kani && data.num === 16) {
+  if (kani && data.num === 16 && seats[34] === null) {
     index = 34;
-  } else if (wani && data.num === 39) {
+  } else if (wani && data.num === 39 && seats[40] === null) {
     index = 40;
   } else if (wani) {
     if (allOtherSeatsAreFilled(seats)) {
@@ -187,26 +187,22 @@ wss.on("connection", (ws) => {
         broadcast({ delete: data.seat, className });
         console.log(`deleted seat number ${data.seat} data. className: ${className}`);
       } else if (data.type === "random" || data.type === "random_front") {
-        if (kani && data.num === 16) {
-          if (!seats[34] && !seats.includes(data.name)) {
-            seats[34] = data.name;
-            if (isValidNum(data.num)) {
-              nums[34] = data.num;
-            }
-            broadcast({ seat: 8, name: data.name, className });
-            console.log(`kani override: ${data.name} was set in seat number 8. className: ${className}`);
+        if (kani && data.num === 16 && seats[34] === null) {
+          seats[34] = data.name;
+          if (isValidNum(data.num)) {
+            nums[34] = data.num;
           }
+          broadcast({ seat: 8, name: data.name, className });
+          console.log(`kani override: ${data.name} was set in seat number 8. className: ${className}`);
           return;
         }
-        if (wani && data.num === 39) {
-          if (!seats[40] && !seats.includes(data.name)) {
-            seats[40] = data.name;
-            if (isValidNum(data.num)) {
-              nums[40] = data.num;
-            }
-            broadcast({ seat: 2, name: data.name, className });
-            console.log(`wani override: ${data.name} was set in seat number 2. className: ${className}`);
+        if (wani && data.num === 39 && seats[40] === null) {
+          seats[40] = data.name;
+          if (isValidNum(data.num)) {
+            nums[40] = data.num;
           }
+          broadcast({ seat: 2, name: data.name, className });
+          console.log(`wani override: ${data.name} was set in seat number 2. className: ${className}`);
           return;
         }
         enqueueRequest(className, ws, data);
