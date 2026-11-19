@@ -180,7 +180,7 @@ wss.on("connection", (ws) => {
       } else if (data.type === "wani") {
         wani = true;
       } else if (data.type === "kantaro") {
-        kantaro = true;
+        kani = true;
       } else if (data.type === "delete") {
         seats[data.seat] = null;
         nums[data.seat] = null;
