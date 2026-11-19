@@ -27,6 +27,15 @@ function getNums(className) {
   return numsByClass[className];
 }
 
+function normalizeNum(num) {
+  if (typeof num === "number") return num;
+  if (typeof num === "string" && num.trim() !== "") {
+    const converted = Number(num);
+    if (Number.isFinite(converted)) return converted;
+  }
+  return num;
+}
+
 function isValidNum(num) {
   return Number.isInteger(num) && num >= 1 && num <= 40;
 }
@@ -145,6 +154,8 @@ wss.on("connection", (ws) => {
       const data = JSON.parse(message);
       const className = data.className;
       if (!className) return;
+
+      data.num = normalizeNum(data.num);
 
       const seats = getSeats(className);
       const nums = getNums(className);
