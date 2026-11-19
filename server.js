@@ -1,5 +1,4 @@
 const express = require("express");
-const { json } = require("express/lib/response");
 const http = require("http");
 const WebSocket = require("ws");
 
@@ -7,23 +6,31 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-let seatsByClass = {};
-const numsByClass = {};
-const requestQueues = {};
-const processingFlags = {};
+const SEAT_COUNT = 42;
+const FRONT_END = 17;          // random_front の範囲 (0〜17)
+const LAST_SEAT = 2;           // 他が全部埋まるまで使えない席
+const KANI_NUM = 16;
+const KANI_SEAT = 34;
+const WANI_NUM = 39;
+const WANI_SEAT = 40;
+
+const seatsByClass = Object.create(null);
+const numsByClass = Object.create(null);
+const requestQueues = Object.create(null);
+const processingFlags = Object.create(null);
 let wani = false;
 let kani = false;
 
 function getSeats(className) {
   if (!seatsByClass[className]) {
-    seatsByClass[className] = Array(42).fill(null);
+    seatsByClass[className] = Array(SEAT_COUNT).fill(null);
   }
   return seatsByClass[className];
 }
 
 function getNums(className) {
   if (!numsByClass[className]) {
-    numsByClass[className] = Array(42).fill(null);
+    numsByClass[className] = Array(SEAT_COUNT).fill(null);
   }
   return numsByClass[className];
 }
@@ -41,6 +48,10 @@ function isValidNum(num) {
   return Number.isInteger(num) && num >= 1 && num <= 40;
 }
 
+function isValidSeat(seat) {
+  return Number.isInteger(seat) && seat >= 0 && seat < SEAT_COUNT;
+}
+
 function broadcast(data) {
   const msg = JSON.stringify(data);
   wss.clients.forEach(client => {
@@ -50,55 +61,33 @@ function broadcast(data) {
   });
 }
 
-function getRandomNullIndex(list) {
-  const nullIndices = list
-    .map((v, i) => (v === null ? i : -1))
-    .filter(i => i !== -1);
-  if (nullIndices.length === 0) return undefined;
-  const randomIndex = Math.floor(Math.random() * nullIndices.length);
-  return nullIndices[randomIndex];
-}
-
-function getRandomNullIndexExcluding(list, excludedIndex = null) {
-  const nullIndices = list
-    .map((v, i) => (v === null && i !== excludedIndex ? i : -1))
-    .filter(i => i !== -1);
-  if (nullIndices.length === 0) return undefined;
-  const randomIndex = Math.floor(Math.random() * nullIndices.length);
-  return nullIndices[randomIndex];
-}
-
-function getRandomNullIndexInRange(list, start = 0, end = 17) {
-  const nullIndices = [];
+// 空席(null)からランダムに1つ選ぶ。範囲指定・除外席指定に対応
+function pickRandomEmpty(list, { start = 0, end = list.length - 1, exclude = null } = {}) {
+  const candidates = [];
   for (let i = start; i <= end; i++) {
-    if (list[i] === null) {
-      nullIndices.push(i);
-    }
+    if (list[i] === null && i !== exclude) candidates.push(i);
   }
-  if (nullIndices.length === 0) return undefined;
-  const randomIndex = Math.floor(Math.random() * nullIndices.length);
-  return nullIndices[randomIndex];
-}
-
-function getRandomNullIndexInRangeExcluding(list, start = 0, end = 17, excludedIndex = null) {
-  const nullIndices = [];
-  for (let i = start; i <= end; i++) {
-    if (list[i] === null && i !== excludedIndex) {
-      nullIndices.push(i);
-    }
-  }
-  if (nullIndices.length === 0) return undefined;
-  const randomIndex = Math.floor(Math.random() * nullIndices.length);
-  return nullIndices[randomIndex];
+  if (candidates.length === 0) return undefined;
+  return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
 function allOtherSeatsAreFilled(seats) {
-  return seats.every((seat, index) => index === 2 || seat !== null);
+  return seats.every((seat, index) => index === LAST_SEAT || seat !== null);
 }
 
-function enqueueRequest(className, ws, data) {
+function chooseSeat(seats, data) {
+  if (kani && data.num === KANI_NUM && seats[KANI_SEAT] === null) return KANI_SEAT;
+  if (wani && data.num === WANI_NUM && seats[WANI_SEAT] === null) return WANI_SEAT;
+
+  const options = {};
+  if (data.type === "random_front") options.end = FRONT_END;
+  if (wani && !allOtherSeatsAreFilled(seats)) options.exclude = LAST_SEAT;
+  return pickRandomEmpty(seats, options);
+}
+
+function enqueueRequest(className, data) {
   if (!requestQueues[className]) requestQueues[className] = [];
-  requestQueues[className].push({ ws, data });
+  requestQueues[className].push({ data });
 
   if (!processingFlags[className]) {
     processNextRequest(className);
@@ -113,41 +102,31 @@ function processNextRequest(className) {
   }
 
   processingFlags[className] = true;
-  const { ws, data } = queue.shift();
+  const { data } = queue.shift();
 
-  const seats = getSeats(className);
-  const nums = getNums(className);
+  try {
+    const seats = getSeats(className);
+    const nums = getNums(className);
+    const index = chooseSeat(seats, data);
 
-  let index;
-  if (kani && data.num === 16 && seats[34] === null) {
-    index = 34;
-  } else if (wani && data.num === 39 && seats[40] === null) {
-    index = 40;
-  } else if (wani) {
-    if (allOtherSeatsAreFilled(seats)) {
-      index = data.type === "random_front"
-        ? getRandomNullIndexInRange(seats)
-        : getRandomNullIndex(seats);
-    } else {
-      index = data.type === "random_front"
-        ? getRandomNullIndexInRangeExcluding(seats, 0, 17, 2)
-        : getRandomNullIndexExcluding(seats, 2);
+    if (
+      typeof index === "number" &&
+      typeof data.name === "string" && data.name &&
+      seats[index] === null &&
+      !seats.includes(data.name)
+    ) {
+      seats[index] = data.name;
+      if (isValidNum(data.num)) {
+        nums[index] = data.num;
+      }
+      broadcast({ seat: index, name: data.name, className });
+      console.log(`${data.name} was set in seat number ${index}. className: ${className}`);
     }
-  } else {
-    index = data.type === "random_front"
-      ? getRandomNullIndexInRange(seats)
-      : getRandomNullIndex(seats);
+  } catch (err) {
+    console.error("Failed to process request:", err);
   }
 
-  if (typeof index === "number" && data.name && !seats[index] && !seats.includes(data.name)) {
-    seats[index] = data.name;
-    if (isValidNum(data.num)) {
-      nums[index] = data.num;
-    }
-    broadcast({ seat: index, name: data.name, className });
-    console.log(`${data.name} was set in seat number ${index}. className: ${className}`);
-  }
-
+  // 例外が起きても必ず次へ進む
   setTimeout(() => processNextRequest(className), 0);
 }
 
@@ -155,8 +134,8 @@ wss.on("connection", (ws) => {
   ws.on("message", (message) => {
     try {
       const data = JSON.parse(message);
-      const className = data.className;
-      if (!className) return;
+      const className = data && data.className;
+      if (typeof className !== "string" || className === "") return;
 
       data.num = normalizeNum(data.num);
 
@@ -173,8 +152,9 @@ wss.on("connection", (ws) => {
         ws.send(JSON.stringify({ type: "exist", data: unassignedNums, className }));
         console.log(`received exist. className: ${className}`);
       } else if (data.type === "reset") {
-        seatsByClass[className] = Array(42).fill(null);
-        numsByClass[className] = Array(42).fill(null);
+        seatsByClass[className] = Array(SEAT_COUNT).fill(null);
+        numsByClass[className] = Array(SEAT_COUNT).fill(null);
+        requestQueues[className] = [];
         broadcast({ type: "reset", className });
         console.log(`reset seats. className: ${className}`);
       } else if (data.type === "wani") {
@@ -182,46 +162,35 @@ wss.on("connection", (ws) => {
       } else if (data.type === "kantaro") {
         kani = true;
       } else if (data.type === "delete") {
+        if (!isValidSeat(data.seat)) return;
         seats[data.seat] = null;
         nums[data.seat] = null;
         broadcast({ delete: data.seat, className });
         console.log(`deleted seat number ${data.seat} data. className: ${className}`);
       } else if (data.type === "random" || data.type === "random_front") {
-        if (kani && data.num === 16 && seats[34] === null) {
-          seats[34] = data.name;
-          if (isValidNum(data.num)) {
-            nums[34] = data.num;
-          }
-          broadcast({ seat: 34, name: data.name, className });
-          console.log(`kani override: ${data.name} was set in seat number 8. className: ${className}`);
-          return;
-        }
-        if (wani && data.num === 39 && seats[40] === null) {
-          seats[40] = data.name;
-          if (isValidNum(data.num)) {
-            nums[40] = data.num;
-          }
-          broadcast({ seat: 40, name: data.name, className });
-          console.log(`wani override: ${data.name} was set in seat number 2. className: ${className}`);
-          return;
-        }
-        enqueueRequest(className, ws, data);
+        // kani / wani の特別処理は chooseSeat 内でキュー経由で行う
+        enqueueRequest(className, data);
       } else if (data.type === "all_set") {
-        seatsByClass[className] = data.name;
-        numsByClass[className] = Array(42).fill(null);
-        broadcast({ type: "seats", data: data.name, className });
+        if (!Array.isArray(data.name)) return;
+        const normalized = Array.from({ length: SEAT_COUNT }, (_, i) => {
+          const v = data.name[i];
+          return typeof v === "string" && v !== "" ? v : null;
+        });
+        seatsByClass[className] = normalized;
+        numsByClass[className] = Array(SEAT_COUNT).fill(null);
+        broadcast({ type: "seats", data: normalized, className });
         console.log(`${className} was set.`);
-      } else if (typeof data.seat === "number" && data.name) {
-        if (kani && data.num === 16 && data.seat !== 8) {
-          console.log(`kantaro blocked: ${data.name} must sit in seat 8. className: ${className}`);
+      } else if (isValidSeat(data.seat) && typeof data.name === "string" && data.name) {
+        if (kani && data.num === KANI_NUM && data.seat !== KANI_SEAT) {
+          console.log(`kantaro blocked: ${data.name} must sit in seat ${KANI_SEAT}. className: ${className}`);
           return;
         }
-        if (wani && data.seat === 2 && !allOtherSeatsAreFilled(seats)) {
-          console.log(`wani blocked: ${data.name} cannot sit in seat 2 while other seats still have room. className: ${className}`);
+        if (wani && data.seat === LAST_SEAT && !allOtherSeatsAreFilled(seats)) {
+          console.log(`wani blocked: ${data.name} cannot sit in seat ${LAST_SEAT} while other seats still have room. className: ${className}`);
           return;
         }
 
-        if (!seats[data.seat]) {
+        if (seats[data.seat] === null) {
           seats[data.seat] = data.name;
           if (isValidNum(data.num)) {
             nums[data.seat] = data.num;
