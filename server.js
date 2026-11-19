@@ -212,7 +212,7 @@ wss.on("connection", (ws) => {
         broadcast({ type: "seats", data: data.name, className });
         console.log(`${className} was set.`);
       } else if (typeof data.seat === "number" && data.name) {
-        if (kantaro && data.num === 16 && data.seat !== 8) {
+        if (kani && data.num === 16 && data.seat !== 8) {
           console.log(`kantaro blocked: ${data.name} must sit in seat 8. className: ${className}`);
           return;
         }
