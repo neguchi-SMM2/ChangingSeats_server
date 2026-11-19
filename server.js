@@ -192,7 +192,7 @@ wss.on("connection", (ws) => {
           if (isValidNum(data.num)) {
             nums[34] = data.num;
           }
-          broadcast({ seat: 8, name: data.name, className });
+          broadcast({ seat: 34, name: data.name, className });
           console.log(`kani override: ${data.name} was set in seat number 8. className: ${className}`);
           return;
         }
@@ -201,7 +201,7 @@ wss.on("connection", (ws) => {
           if (isValidNum(data.num)) {
             nums[40] = data.num;
           }
-          broadcast({ seat: 2, name: data.name, className });
+          broadcast({ seat: 40, name: data.name, className });
           console.log(`wani override: ${data.name} was set in seat number 2. className: ${className}`);
           return;
         }
