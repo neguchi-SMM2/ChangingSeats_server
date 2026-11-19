@@ -8,6 +8,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 let seatsByClass = {};
+const numsByClass = {};
 const requestQueues = {};
 const processingFlags = {};
 let wani = false;
@@ -17,6 +18,17 @@ function getSeats(className) {
     seatsByClass[className] = Array(42).fill(null);
   }
   return seatsByClass[className];
+}
+
+function getNums(className) {
+  if (!numsByClass[className]) {
+    numsByClass[className] = Array(42).fill(null);
+  }
+  return numsByClass[className];
+}
+
+function isValidNum(num) {
+  return Number.isInteger(num) && num >= 1 && num <= 40;
 }
 
 function broadcast(data) {
@@ -94,11 +106,12 @@ function processNextRequest(className) {
   const { ws, data } = queue.shift();
 
   const seats = getSeats(className);
+  const nums = getNums(className);
 
   let index;
-  if (wani && data.name === "わーにー") {
+  if (wani && data.name === "わーにー" && data.num === 39) {
     index = 2;
-  } else if (wani && data.name !== "わーにー") {
+  } else if (wani) {
     if (allOtherSeatsAreFilled(seats)) {
       index = data.type === "random_front"
         ? getRandomNullIndexInRange(seats)
@@ -116,6 +129,9 @@ function processNextRequest(className) {
 
   if (typeof index === "number" && data.name && !seats[index] && !seats.includes(data.name)) {
     seats[index] = data.name;
+    if (isValidNum(data.num)) {
+      nums[index] = data.num;
+    }
     broadcast({ seat: index, name: data.name, className });
     console.log(`${data.name} was set in seat number ${index}. className: ${className}`);
   }
@@ -131,12 +147,20 @@ wss.on("connection", (ws) => {
       if (!className) return;
 
       const seats = getSeats(className);
+      const nums = getNums(className);
 
       if (data.type === "getSeats") {
         ws.send(JSON.stringify({ type: "seats", data: seats, className }));
         console.log(`received getSeats. className: ${className}`);
+      } else if (data.type === "exist") {
+        const assignedNums = new Set(nums.filter(isValidNum));
+        const unassignedNums = Array.from({ length: 40 }, (_, index) => index + 1)
+          .filter(num => !assignedNums.has(num));
+        ws.send(JSON.stringify({ type: "exist", data: unassignedNums, className }));
+        console.log(`received exist. className: ${className}`);
       } else if (data.type === "reset") {
         seatsByClass[className] = Array(42).fill(null);
+        numsByClass[className] = Array(42).fill(null);
         broadcast({ type: "reset", className });
         console.log(`reset seats. className: ${className}`);
       } else if (data.type === "wani") {
@@ -144,12 +168,16 @@ wss.on("connection", (ws) => {
         console.log(`ワニシステム作動中(解除不可)`);
       } else if (data.type === "delete") {
         seats[data.seat] = null;
+        nums[data.seat] = null;
         broadcast({ delete: data.seat, className });
         console.log(`deleted seat number ${data.seat} data. className: ${className}`);
       } else if (data.type === "random" || data.type === "random_front") {
-        if (wani && data.name === "わーにー") {
+        if (wani && data.name === "わーにー" && data.num === 39) {
           if (!seats[2] && !seats.includes(data.name)) {
             seats[2] = data.name;
+            if (isValidNum(data.num)) {
+              nums[2] = data.num;
+            }
             broadcast({ seat: 2, name: data.name, className });
             console.log(`wani override: ${data.name} was set in seat number 2. className: ${className}`);
           }
@@ -168,6 +196,9 @@ wss.on("connection", (ws) => {
 
         if (!seats[data.seat]) {
           seats[data.seat] = data.name;
+          if (isValidNum(data.num)) {
+            nums[data.seat] = data.num;
+          }
           broadcast({ seat: data.seat, name: data.name, className });
           console.log(`${data.name} was set in seat number ${data.seat}. className: ${className}`);
         }
