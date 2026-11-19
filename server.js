@@ -109,7 +109,7 @@ function processNextRequest(className) {
   const nums = getNums(className);
 
   let index;
-  if (wani && data.name === "わーにー" && data.num === 39) {
+  if (wani && data.num === 39) {
     index = 2;
   } else if (wani) {
     if (allOtherSeatsAreFilled(seats)) {
@@ -165,14 +165,13 @@ wss.on("connection", (ws) => {
         console.log(`reset seats. className: ${className}`);
       } else if (data.type === "wani") {
         wani = true;
-        console.log(`ワニシステム作動中(解除不可)`);
       } else if (data.type === "delete") {
         seats[data.seat] = null;
         nums[data.seat] = null;
         broadcast({ delete: data.seat, className });
         console.log(`deleted seat number ${data.seat} data. className: ${className}`);
       } else if (data.type === "random" || data.type === "random_front") {
-        if (wani && data.name === "わーにー" && data.num === 39) {
+        if (wani && data.num === 39) {
           if (!seats[2] && !seats.includes(data.name)) {
             seats[2] = data.name;
             if (isValidNum(data.num)) {
@@ -190,7 +189,7 @@ wss.on("connection", (ws) => {
         broadcast({ type: "seats", data: data.name, className });
         console.log(`${className} was set.`);
       } else if (typeof data.seat === "number" && data.name) {
-        if (wani && data.name !== "わーにー" && data.seat === 2 && !allOtherSeatsAreFilled(seats)) {
+        if (wani && data.seat === 2 && !allOtherSeatsAreFilled(seats)) {
           console.log(`wani blocked: ${data.name} cannot sit in seat 2 while other seats still have room. className: ${className}`);
           return;
         }
